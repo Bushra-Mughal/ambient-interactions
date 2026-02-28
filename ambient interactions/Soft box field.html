@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Soft Box Field</title>
+<style>
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #f2f4f7;
+  overflow: hidden;
+}
+canvas { display: block; }
+#hint {
+  position: fixed;
+  bottom: 16px;
+  width: 100%;
+  text-align: center;
+  font-family: system-ui, monospace;
+  font-size: 13px;
+  color: #7a8794;
+  opacity: 0.7;
+}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hint">Move • Push the space • Click to reorganize</div>
+
+<script>
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+
+let w, h;
+function resize() {
+  w = canvas.width = innerWidth;
+  h = canvas.height = innerHeight;
+}
+resize();
+addEventListener("resize", resize);
+
+/* ================= MOUSE ================= */
+const mouse = {
+  x: w/2, y: h/2,
+  px: w/2, py: h/2,
+  vx: 0, vy: 0
+};
+
+addEventListener("mousemove", e => {
+  mouse.px = mouse.x;
+  mouse.py = mouse.y;
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
+  mouse.vx = mouse.x - mouse.px;
+  mouse.vy = mouse.y - mouse.py;
+});
+
+let pulse = 0;
+addEventListener("mousedown", () => pulse = 1);
+
+/* ================= BOXES ================= */
+const BOX_COUNT = 140;
+const boxes = [];
+
+for (let i = 0; i < BOX_COUNT; i++) {
+  boxes.push({
+    x: Math.random() * w,
+    y: Math.random() * h,
+    vx: 0,
+    vy: 0,
+    size: 12 + Math.random() * 18,
+    rot: Math.random() * Math.PI,
+    vr: (Math.random() - 0.5) * 0.01,
+    hue: 200 + Math.random() * 40
+  });
+}
+
+/* ================= DRAW ================= */
+function drawBox(b) {
+  ctx.save();
+  ctx.translate(b.x, b.y);
+  ctx.rotate(b.rot);
+
+  // soft shadow
+  ctx.fillStyle = "rgba(0,0,0,0.06)";
+  ctx.fillRect(-b.size/2 + 2, -b.size/2 + 3, b.size, b.size);
+
+  // box
+  ctx.fillStyle = `hsla(${b.hue}, 40%, 75%, 0.9)`;
+  ctx.fillRect(-b.size/2, -b.size/2, b.size, b.size);
+
+  ctx.restore();
+}
+
+/* ================= ANIMATION ================= */
+function animate() {
+  requestAnimationFrame(animate);
+
+  ctx.fillStyle = "rgba(242,244,247,0.25)";
+  ctx.fillRect(0, 0, w, h);
+
+  boxes.forEach(b => {
+    const dx = mouse.x - b.x;
+    const dy = mouse.y - b.y;
+    const dist = Math.sqrt(dx*dx + dy*dy) + 0.001;
+
+    // mouse push
+    const speed = Math.sqrt(mouse.vx*mouse.vx + mouse.vy*mouse.vy);
+    const influence = Math.exp(-dist * 0.01) * speed * 0.02;
+
+    b.vx -= (dx / dist) * influence;
+    b.vy -= (dy / dist) * influence;
+
+    // pulse rearrangement
+    if (pulse > 0) {
+      b.vx += Math.cos(dist * 0.05) * pulse * 0.6;
+      b.vy += Math.sin(dist * 0.05) * pulse * 0.6;
+    }
+
+    // drift
+    b.vx += Math.sin(b.y * 0.01) * 0.01;
+    b.vy += Math.cos(b.x * 0.01) * 0.01;
+
+    // motion
+    b.x += b.vx;
+    b.y += b.vy;
+    b.rot += b.vr;
+
+    // damping
+    b.vx *= 0.92;
+    b.vy *= 0.92;
+
+    // wrap around edges
+    if (b.x < -50) b.x = w + 50;
+    if (b.x > w + 50) b.x = -50;
+    if (b.y < -50) b.y = h + 50;
+    if (b.y > h + 50) b.y = -50;
+
+    drawBox(b);
+  });
+
+  pulse *= 0.94;
+}
+
+animate();
+</script>
+</body>
+</html>

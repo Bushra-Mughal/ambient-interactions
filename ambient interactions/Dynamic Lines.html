@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Neural Light Web</title>
+<style>
+body {
+  margin: 0;
+  overflow: hidden;
+  background: radial-gradient(circle at center, #050014, #000);
+}
+#hint {
+  position: fixed;
+  bottom: 15px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: monospace;
+  color: #9ad8ff;
+  opacity: 0.65;
+}
+</style>
+</head>
+<body>
+<div id="hint">Move • Hold • Release • Scroll</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+
+<script>
+/* ================= CORE ================= */
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(65, innerWidth / innerHeight, 0.1, 1000);
+camera.position.z = 80;
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(devicePixelRatio);
+document.body.appendChild(renderer.domElement);
+
+/* ================= WEB NODES ================= */
+const NODES = 320;
+const RANGE = 45;
+const nodes = [];
+const velocities = [];
+
+for (let i = 0; i < NODES; i++) {
+  nodes.push(new THREE.Vector3(
+    (Math.random() - 0.5) * RANGE,
+    (Math.random() - 0.5) * RANGE,
+    (Math.random() - 0.5) * RANGE
+  ));
+  velocities.push(new THREE.Vector3(
+    (Math.random() - 0.5) * 0.05,
+    (Math.random() - 0.5) * 0.05,
+    (Math.random() - 0.5) * 0.05
+  ));
+}
+
+/* ================= LINE GEOMETRY ================= */
+const MAX_CONNECTIONS = 2400;
+const positions = new Float32Array(MAX_CONNECTIONS * 6);
+const colors = new Float32Array(MAX_CONNECTIONS * 6);
+
+const geometry = new THREE.BufferGeometry();
+geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+
+const material = new THREE.LineBasicMaterial({
+  vertexColors: true,
+  transparent: true,
+  blending: THREE.AdditiveBlending
+});
+
+const lines = new THREE.LineSegments(geometry, material);
+scene.add(lines);
+
+/* ================= INTERACTION ================= */
+const mouse = new THREE.Vector3();
+let holding = false;
+let timeScale = 1;
+
+addEventListener("mousemove", e => {
+  mouse.x = (e.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+  mouse.z = 0;
+});
+
+addEventListener("mousedown", () => holding = true);
+addEventListener("mouseup", () => holding = false);
+
+addEventListener("wheel", e => {
+  camera.position.z += e.deltaY * 0.05;
+  camera.position.z = Math.max(25, Math.min(160, camera.position.z));
+});
+
+/* ================= ANIMATION ================= */
+let t = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  t += 0.01 * timeScale;
+
+  let ptr = 0;
+
+  for (let i = 0; i < NODES; i++) {
+    const n = nodes[i];
+    const v = velocities[i];
+
+    const mx = mouse.x * 40;
+    const my = mouse.y * 40;
+
+    const dx = mx - n.x;
+    const dy = my - n.y;
+    const dist = Math.sqrt(dx*dx + dy*dy) + 0.1;
+
+    const force = holding ? 0.08 : -0.02;
+    v.x += (dx / dist) * force * 0.02;
+    v.y += (dy / dist) * force * 0.02;
+
+    n.add(v);
+    v.multiplyScalar(0.985);
+
+    if (n.length() > RANGE) n.multiplyScalar(0.95);
+  }
+
+  for (let i = 0; i < NODES; i++) {
+    for (let j = i + 1; j < NODES; j++) {
+      const a = nodes[i];
+      const b = nodes[j];
+      const d = a.distanceTo(b);
+
+      if (d < 12 && ptr < MAX_CONNECTIONS * 6) {
+        positions[ptr] = a.x;
+        positions[ptr+1] = a.y;
+        positions[ptr+2] = a.z;
+        positions[ptr+3] = b.x;
+        positions[ptr+4] = b.y;
+        positions[ptr+5] = b.z;
+
+        const hue = 0.5 + Math.sin(t + d) * 0.5;
+        colors[ptr] = hue;
+        colors[ptr+1] = 0.3;
+        colors[ptr+2] = 1.0;
+        colors[ptr+3] = hue;
+        colors[ptr+4] = 0.6;
+        colors[ptr+5] = 1.0;
+
+        ptr += 6;
+      }
+    }
+  }
+
+  geometry.setDrawRange(0, ptr / 3);
+  geometry.attributes.position.needsUpdate = true;
+  geometry.attributes.color.needsUpdate = true;
+
+  scene.rotation.y += 0.0008;
+  scene.rotation.x += mouse.y * 0.001;
+
+  renderer.render(scene, camera);
+}
+
+animate();
+
+/* ================= RESIZE ================= */
+addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Magnetic Flow Grid</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: #050510;
+  }
+  canvas {
+    display: block;
+  }
+  #hint {
+    position: fixed;
+    bottom: 14px;
+    width: 100%;
+    text-align: center;
+    font-family: monospace;
+    color: #9abaff;
+    opacity: 0.6;
+  }
+</style>
+</head>
+<body>
+<div id="hint">Move mouse • Click • Watch the grid bend</div>
+
+<canvas id="c"></canvas>
+
+<script>
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+
+let w, h;
+function resize() {
+  w = canvas.width = innerWidth;
+  h = canvas.height = innerHeight;
+}
+resize();
+addEventListener("resize", resize);
+
+const mouse = { x: 0, y: 0, down: false };
+addEventListener("mousemove", e => {
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
+});
+addEventListener("mousedown", () => mouse.down = true);
+addEventListener("mouseup", () => mouse.down = false);
+
+const spacing = 32;
+let time = 0;
+
+function drawLine(x1, y1, x2, y2, hue) {
+  ctx.strokeStyle = `hsla(${hue}, 100%, 65%, 0.75)`;
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  time += 0.01;
+
+  ctx.fillStyle = "rgba(5,5,16,0.25)";
+  ctx.fillRect(0, 0, w, h);
+
+  ctx.lineWidth = 1.2;
+
+  for (let y = 0; y < h; y += spacing) {
+    for (let x = 0; x < w; x += spacing) {
+
+      const dx = mouse.x - x;
+      const dy = mouse.y - y;
+      const dist = Math.sqrt(dx*dx + dy*dy) + 0.001;
+
+      const force = mouse.down ? 120 / dist : 60 / dist;
+
+      const angle =
+        Math.sin(x * 0.01 + time) +
+        Math.cos(y * 0.01 - time) +
+        force * 0.05;
+
+      const len = 18;
+
+      const x2 = x + Math.cos(angle) * len;
+      const y2 = y + Math.sin(angle) * len;
+
+      const hue = (x + y) * 0.1 + time * 80;
+
+      drawLine(x, y, x2, y2, hue);
+    }
+  }
+}
+
+animate();
+</script>
+</body>
+</html>

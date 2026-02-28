@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Sci-Fi Particle Universe</title>
+<style>
+body {
+  margin: 0;
+  overflow: hidden;
+  background: radial-gradient(#050505, #000);
+}
+#hint {
+  position: fixed;
+  bottom: 15px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #88ccff;
+  font-family: monospace;
+  opacity: 0.6;
+}
+</style>
+</head>
+<body>
+<div id="hint">
+Move • Hold Click • Release • Scroll
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+
+<script>
+/* ================== CORE ================== */
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 1000);
+camera.position.z = 65;
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(devicePixelRatio);
+document.body.appendChild(renderer.domElement);
+
+/* ================== PARTICLES ================== */
+const COUNT = 9000;
+const geometry = new THREE.BufferGeometry();
+const pos = new Float32Array(COUNT * 3);
+const vel = new Float32Array(COUNT * 3);
+const col = new Float32Array(COUNT * 3);
+
+for (let i = 0; i < COUNT; i++) {
+  const r = Math.random() * 25;
+  const t = Math.random() * Math.PI * 2;
+  const p = Math.random() * Math.PI;
+
+  pos[i*3]     = Math.cos(t) * Math.sin(p) * r;
+  pos[i*3 + 1] = Math.cos(p) * r;
+  pos[i*3 + 2] = Math.sin(t) * Math.sin(p) * r;
+
+  vel[i*3]     = (Math.random() - 0.5) * 0.02;
+  vel[i*3 + 1] = (Math.random() - 0.5) * 0.02;
+  vel[i*3 + 2] = (Math.random() - 0.5) * 0.02;
+
+  col[i*3]     = 0.3;
+  col[i*3 + 1] = 0.7;
+  col[i*3 + 2] = 1;
+}
+
+geometry.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+geometry.setAttribute("color", new THREE.BufferAttribute(col, 3));
+
+const material = new THREE.PointsMaterial({
+  size: 0.28,
+  vertexColors: true,
+  transparent: true,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false
+});
+
+const particles = new THREE.Points(geometry, material);
+scene.add(particles);
+
+/* ================== INTERACTION ================== */
+const mouse = { x: 0, y: 0 };
+let timeScale = 1;
+let holding = false;
+
+addEventListener("mousemove", e => {
+  mouse.x = (e.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / innerHeight) * 2 + 1;
+});
+
+addEventListener("mousedown", () => holding = true);
+addEventListener("mouseup", () => {
+  holding = false;
+  explode();
+});
+
+addEventListener("wheel", e => {
+  timeScale += e.deltaY * -0.0005;
+  timeScale = Math.max(0.2, Math.min(2.5, timeScale));
+});
+
+/* ================== PHYSICS ================== */
+function explode() {
+  for (let i = 0; i < COUNT; i++) {
+    vel[i*3]     += (Math.random() - 0.5) * 0.8;
+    vel[i*3 + 1] += (Math.random() - 0.5) * 0.8;
+    vel[i*3 + 2] += (Math.random() - 0.5) * 0.8;
+  }
+}
+
+/* ================== ANIMATION ================== */
+let t = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  t += 0.01 * timeScale;
+
+  const p = geometry.attributes.position.array;
+
+  for (let i = 0; i < COUNT; i++) {
+    const ix = i*3, iy = ix+1, iz = ix+2;
+
+    const dx = mouse.x * 20 - p[ix];
+    const dy = mouse.y * 20 - p[iy];
+    const dz = -p[iz];
+
+    const dist = Math.sqrt(dx*dx + dy*dy + dz*dz) + 0.1;
+    const force = holding ? -0.03 : 0.01;
+
+    vel[ix] += (dx / dist) * force;
+    vel[iy] += (dy / dist) * force;
+    vel[iz] += (dz / dist) * force;
+
+    p[ix] += vel[ix];
+    p[iy] += vel[iy];
+    p[iz] += vel[iz];
+
+    vel[ix] *= 0.98;
+    vel[iy] *= 0.98;
+    vel[iz] *= 0.98;
+
+    col[ix]     = 0.5 + Math.sin(t + p[ix]*0.1)*0.5;
+    col[iy]     = 0.5 + Math.sin(t + p[iy]*0.1)*0.5;
+    col[iz]     = 1;
+  }
+
+  geometry.attributes.position.needsUpdate = true;
+  geometry.attributes.color.needsUpdate = true;
+
+  particles.rotation.y += 0.001;
+  particles.rotation.x += mouse.y * 0.002;
+
+  camera.position.x += Math.sin(t*0.3) * 0.02;
+  camera.position.y += Math.cos(t*0.2) * 0.02;
+
+  renderer.render(scene, camera);
+}
+animate();
+
+/* ================== RESIZE ================== */
+addEventListener("resize", () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>

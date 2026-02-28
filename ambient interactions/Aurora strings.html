@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Aurora Strings</title>
+<style>
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #02040a;
+  overflow: hidden;
+}
+canvas {
+  display: block;
+}
+#hint {
+  position: fixed;
+  bottom: 14px;
+  width: 100%;
+  text-align: center;
+  font-family: monospace;
+  color: #9ce0ff;
+  opacity: 0.6;
+}
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div id="hint">Move • Click • Pluck the light</div>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+let w, h;
+function resize() {
+  w = canvas.width = innerWidth;
+  h = canvas.height = innerHeight;
+}
+resize();
+addEventListener("resize", resize);
+
+const mouse = { x: w/2, y: h/2 };
+addEventListener("mousemove", e => {
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
+});
+
+let pulse = 0;
+addEventListener("mousedown", () => pulse = 1);
+
+/* ================= STRINGS ================= */
+const STRINGS = 80;
+const POINTS = 120;
+const strings = [];
+
+for (let i = 0; i < STRINGS; i++) {
+  const baseY = (i / STRINGS) * h;
+  const pts = [];
+
+  for (let j = 0; j < POINTS; j++) {
+    pts.push({
+      x: (j / POINTS) * w,
+      y: baseY,
+      vy: 0
+    });
+  }
+
+  strings.push({
+    baseY,
+    points: pts,
+    hue: 180 + Math.random() * 120
+  });
+}
+
+/* ================= ANIMATION ================= */
+let t = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  t += 0.01;
+
+  ctx.fillStyle = "rgba(2,4,10,0.18)";
+  ctx.fillRect(0, 0, w, h);
+
+  ctx.lineWidth = 1.5;
+
+  strings.forEach(str => {
+    ctx.beginPath();
+
+    str.points.forEach((p, i) => {
+      const dx = mouse.x - p.x;
+      const dy = mouse.y - p.y;
+      const dist = Math.sqrt(dx*dx + dy*dy) + 0.001;
+
+      // mouse pluck force
+      p.vy += (dy / dist) * 0.03;
+
+      // shock pulse
+      if (pulse > 0) {
+        p.vy += Math.sin(dist * 0.05) * pulse * 2;
+      }
+
+      // spring back
+      const tension = (str.baseY - p.y) * 0.02;
+      p.vy += tension;
+
+      // damping
+      p.vy *= 0.92;
+      p.y += p.vy;
+
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
+
+    const glow = 0.6 + Math.sin(t + str.baseY * 0.01) * 0.3;
+    ctx.strokeStyle = `hsla(${str.hue + t*30}, 100%, 65%, ${glow})`;
+    ctx.stroke();
+  });
+
+  pulse *= 0.92;
+}
+
+animate();
+</script>
+</body>
+</html>

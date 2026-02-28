@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Living Isometric City</title>
+<style>
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #f3f5f7;
+  overflow: hidden;
+}
+canvas { display: block; }
+#hint {
+  position: fixed;
+  bottom: 16px;
+  width: 100%;
+  text-align: center;
+  font-family: system-ui, monospace;
+  font-size: 13px;
+  color: #7b8894;
+  opacity: 0.75;
+}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hint">Move • Shape the city • Click = seismic wave</div>
+
+<script>
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+
+let w, h;
+function resize() {
+  w = canvas.width = innerWidth;
+  h = canvas.height = innerHeight;
+}
+resize();
+addEventListener("resize", resize);
+
+/* ================= MOUSE ================= */
+const mouse = { x: w/2, y: h/2 };
+addEventListener("mousemove", e => {
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
+});
+
+let pulse = 0;
+addEventListener("mousedown", () => pulse = 1);
+
+/* ================= GRID ================= */
+const COLS = 26;
+const ROWS = 26;
+const TILE = 28;
+
+const grid = [];
+for (let y = 0; y < ROWS; y++) {
+  for (let x = 0; x < COLS; x++) {
+    grid.push({
+      gx: x,
+      gy: y,
+      h: Math.random() * 6,
+      vh: 0
+    });
+  }
+}
+
+/* ================= ISO UTILS ================= */
+function iso(x, y, z) {
+  return {
+    x: (x - y) * TILE + w / 2,
+    y: (x + y) * TILE * 0.5 - z + h / 3
+  };
+}
+
+function drawBox(x, y, z, height) {
+  const top = iso(x, y, height);
+  const left = iso(x, y + 1, height);
+  const right = iso(x + 1, y, height);
+  const bottom = iso(x + 1, y + 1, height);
+
+  // top
+  ctx.beginPath();
+  ctx.moveTo(top.x, top.y);
+  ctx.lineTo(right.x, right.y);
+  ctx.lineTo(bottom.x, bottom.y);
+  ctx.lineTo(left.x, left.y);
+  ctx.closePath();
+  ctx.fillStyle = "#dfe6ec";
+  ctx.fill();
+
+  // left face
+  ctx.beginPath();
+  ctx.moveTo(left.x, left.y);
+  ctx.lineTo(bottom.x, bottom.y);
+  ctx.lineTo(iso(x + 1, y + 1, 0).x, iso(x + 1, y + 1, 0).y);
+  ctx.lineTo(iso(x, y + 1, 0).x, iso(x, y + 1, 0).y);
+  ctx.closePath();
+  ctx.fillStyle = "#cfd7df";
+  ctx.fill();
+
+  // right face
+  ctx.beginPath();
+  ctx.moveTo(right.x, right.y);
+  ctx.lineTo(bottom.x, bottom.y);
+  ctx.lineTo(iso(x + 1, y + 1, 0).x, iso(x + 1, y + 1, 0).y);
+  ctx.lineTo(iso(x + 1, y, 0).x, iso(x + 1, y, 0).y);
+  ctx.closePath();
+  ctx.fillStyle = "#bfc9d4";
+  ctx.fill();
+}
+
+/* ================= ANIMATION ================= */
+let t = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  t += 0.01;
+
+  ctx.fillStyle = "#f3f5f7";
+  ctx.fillRect(0, 0, w, h);
+
+  grid.forEach(c => {
+    const px = iso(c.gx, c.gy, 0);
+    const dx = mouse.x - px.x;
+    const dy = mouse.y - px.y;
+    const dist = Math.sqrt(dx*dx + dy*dy) + 0.001;
+
+    // mouse terrain influence
+    c.vh += Math.exp(-dist * 0.01) * 0.15;
+
+    // seismic pulse
+    if (pulse > 0) {
+      c.vh += Math.sin(dist * 0.05 - t * 6) * pulse * 0.8;
+    }
+
+    // breathing terrain
+    c.vh += Math.sin(t + c.gx * 0.4 + c.gy * 0.4) * 0.01;
+
+    // damping
+    c.vh *= 0.9;
+    c.h += c.vh;
+    c.h = Math.max(0, Math.min(20, c.h));
+  });
+
+  // depth sort
+  grid
+    .slice()
+    .sort((a, b) => (a.gx + a.gy) - (b.gx + b.gy))
+    .forEach(c => drawBox(c.gx, c.gy, 0, c.h));
+
+  pulse *= 0.92;
+}
+
+animate();
+</script>
+</body>
+</html>
